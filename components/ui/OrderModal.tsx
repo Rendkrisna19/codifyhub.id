@@ -45,7 +45,6 @@ export default function OrderModal({ isOpen, onClose }: OrderModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    setErrorMsg(null)
 
     try {
       const res = await fetch('/api/orders', {

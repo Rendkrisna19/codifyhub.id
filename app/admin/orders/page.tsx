@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Clock, Circle, AlertCircle, CheckCircle2, Ban, Phone, Mail, Search, Filter, ChevronDown, RefreshCw, Trash2 } from 'lucide-react'
+import { Clock, Circle, AlertCircle, CheckCircle2, Ban, Phone, Mail, Search, Filter, ChevronDown, RefreshCw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Toast, confirmDelete } from '@/lib/swal'
 
 type OrderStatus = 'Pending' | 'DP' | 'Dikerjakan' | 'Lunas' | 'Batal'
@@ -32,9 +32,14 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('Semua')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1) }, [search, filterStatus, itemsPerPage])
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
@@ -95,6 +100,11 @@ export default function OrdersPage() {
     const matchStatus = filterStatus === 'Semua' || o.status === filterStatus
     return matchSearch && matchStatus
   })
+
+  // Pagination logic
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedOrders = filtered.slice(startIndex, startIndex + itemsPerPage)
 
   // Summary counts
   const counts = allStatuses.reduce((acc, s) => {
@@ -183,7 +193,7 @@ export default function OrdersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filtered.map((order) => {
+                  {paginatedOrders.map((order) => {
                     const sc = statusConfig[order.status] ?? statusConfig['Pending']
                     const Icon = sc.icon
                     const isSelected = selectedOrder?.id === order.id
@@ -223,8 +233,44 @@ export default function OrdersPage() {
                   })}
                 </tbody>
               </table>
-              <div className="px-5 py-3 border-t border-gray-50">
-                <p className="text-xs text-gray-400">Menampilkan {filtered.length} dari {orders.length} order</p>
+              <div className="px-5 py-3 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="text-xs font-medium bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#0A192F] cursor-pointer"
+                  >
+                    <option value={5}>5 baris</option>
+                    <option value={10}>10 baris</option>
+                    <option value={15}>15 baris</option>
+                    <option value={50}>50 baris</option>
+                  </select>
+                  <p className="text-xs text-gray-400">
+                    Menampilkan <strong className="text-gray-600">{filtered.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, filtered.length)}</strong> dari <strong className="text-gray-600">{filtered.length}</strong> data
+                  </p>
+                </div>
+                
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="p-1.5 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition flex items-center justify-center"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <div className="text-xs font-semibold text-gray-600 px-2 bg-gray-50 rounded-lg py-1.5 border border-gray-100">
+                      Hal {currentPage} / {totalPages}
+                    </div>
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition flex items-center justify-center"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

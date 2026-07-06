@@ -23,6 +23,7 @@ export default function ProjectsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -35,19 +36,44 @@ export default function ProjectsPage() {
     setLoading(false)
   }
 
-  const openAdd = () => { setForm(emptyForm); setEditId(null); setShowForm(true) }
-  const openEdit = (p: Project) => { setForm({ title: p.title, description: p.description, image_url: p.image_url, client_name: p.client_name, link: p.link ?? '' }); setEditId(p.id); setShowForm(true) }
-  const closeForm = () => { setShowForm(false); setEditId(null) }
+  const openAdd = () => { setForm(emptyForm); setEditId(null); setImageFile(null); setShowForm(true) }
+  const openEdit = (p: Project) => { setForm({ title: p.title, description: p.description, image_url: p.image_url, client_name: p.client_name, link: p.link ?? '' }); setEditId(p.id); setImageFile(null); setShowForm(true) }
+  const closeForm = () => { setShowForm(false); setEditId(null); setImageFile(null) }
 
   const handleSave = async () => {
     if (!form.title) return
     setSaving(true)
+    
+    let uploadedUrl = form.image_url
+    if (imageFile) {
+      const fileExt = imageFile.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('projects')
+        .upload(fileName, imageFile)
+
+      if (uploadError) {
+        Toast.fire({ icon: 'error', title: 'Gagal upload gambar! Pastikan bucket "projects" sudah ada dan disetting Public.' })
+        setSaving(false)
+        return
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('projects')
+        .getPublicUrl(fileName)
+        
+      uploadedUrl = publicUrl
+    }
+
+    const payload = { ...form, image_url: uploadedUrl }
     let err = null
+    
     if (editId) {
-      const { error } = await supabase.from('projects').update(form).eq('id', editId)
+      const { error } = await supabase.from('projects').update(payload).eq('id', editId)
       err = error
     } else {
-      const { error } = await supabase.from('projects').insert([form])
+      const { error } = await supabase.from('projects').insert([payload])
       err = error
     }
     
@@ -158,23 +184,33 @@ export default function ProjectsPage() {
               <h2 className="font-bold text-gray-900 text-base">{editId ? 'Edit Project' : 'Tambah Project Baru'}</h2>
               <button onClick={closeForm} className="text-gray-400 hover:text-gray-600 transition"><X size={18} /></button>
             </div>
+            
             <div className="space-y-4">
-              {[
-                { key: 'title', label: 'Nama Project *', placeholder: 'Sistem Informasi ...' },
-                { key: 'client_name', label: 'Nama Klien', placeholder: 'PT. / CV. / ...' },
-                { key: 'image_url', label: 'URL Gambar', placeholder: 'https://...' },
-                { key: 'link', label: 'Link Demo (Opsional)', placeholder: 'https://...' },
-              ].map(field => (
-                <div key={field.key}>
-                  <label className="text-xs font-semibold text-gray-500 mb-1.5 block">{field.label}</label>
-                  <input
-                    value={(form as any)[field.key]}
-                    onChange={e => setForm({ ...form, [field.key]: e.target.value })}
-                    className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-                    placeholder={field.placeholder}
-                  />
-                </div>
-              ))}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Nama Project *</label>
+                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" placeholder="Sistem Informasi ..." />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Nama Klien</label>
+                <input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" placeholder="PT. / CV. / ..." />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Gambar Project (Opsional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) setImageFile(e.target.files[0])
+                  }} 
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" 
+                />
+                {form.image_url && !imageFile && <p className="text-[10px] text-gray-400 mt-1 truncate">Gambar saat ini: {form.image_url}</p>}
+                {imageFile && <p className="text-[10px] text-blue-500 mt-1 truncate">Akan diupload: {imageFile.name}</p>}
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Link Demo (Opsional)</label>
+                <input value={form.link} onChange={e => setForm({ ...form, link: e.target.value })} className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" placeholder="https://..." />
+              </div>
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Deskripsi</label>
                 <textarea
@@ -186,6 +222,7 @@ export default function ProjectsPage() {
                 />
               </div>
             </div>
+
             <div className="flex gap-3 mt-5">
               <button onClick={closeForm} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">Batal</button>
               <button onClick={handleSave} disabled={saving || !form.title}

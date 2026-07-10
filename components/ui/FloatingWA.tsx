@@ -1,12 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { MessageCircle } from 'lucide-react'
 
 export default function FloatingWA() {
+  const pathname = usePathname()
   const [waNumber, setWaNumber] = useState('6282275373233')
   const [showText, setShowText] = useState(false)
+
+  if (pathname?.startsWith('/admin')) {
+    return null
+  }
 
   useEffect(() => {
     async function fetchSettings() {
